@@ -1,0 +1,1 @@
+# eridol-core
