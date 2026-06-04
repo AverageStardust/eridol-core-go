@@ -1,4 +1,4 @@
-package "github.com/averagestardust/eridol-core-go"
+package core
 
 import (
 	"container/ring"
