@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"log"
-	"math"
 
 	"github.com/gen2brain/malgo"
 )
@@ -14,8 +13,6 @@ var DoLogging = false
 
 var context *malgo.AllocatedContext
 var device *malgo.Device
-var inputRing *ring[float64] = newRing[float64](1 << 14)
-var ouputRing *ring[float64] = newRing[float64](1 << 14)
 
 func Init() {
 	if context != nil {
@@ -47,6 +44,8 @@ func Init() {
 	deviceConfig.Playback.Format = malgo.FormatS16
 	deviceConfig.Playback.Channels = 1
 	deviceConfig.SampleRate = sampleRate
+	deviceConfig.NoPreSilencedOutputBuffer = 1
+	deviceConfig.NoClip = 1
 	deviceConfig.Alsa.NoMMap = 1
 
 	captureCallbacks := malgo.DeviceCallbacks{
@@ -101,23 +100,18 @@ func Uninit() {
 
 func audioDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
 	// read input
-	for i := range frameCount {
-		bits := binary.NativeEndian.Uint16(inBuffer[i*2:])
-		amp := float64(int16(bits)) / math.MaxInt16
-		inputRing.Enqueue(amp)
-	}
-
+	enqueueData(inBuffer, frameCount)
 	if DoLogging {
 		println("eridol-core: Read ", frameCount, " frames of audio input")
 	}
 
-	zeroOutput := uint32(ouputRing.Size()) >= frameCount && false
+	go analyze()
 
-	if zeroOutput {
+	if true {
 		// fill zeros
 		for i := range frameCount {
 			bits := uint16(int16(0))
-			binary.NativeEndian.PutUint16(inBuffer[i*2:], bits)
+			binary.NativeEndian.PutUint16(outBuffer[i*2:], bits)
 		}
 
 		if DoLogging {
@@ -126,14 +120,14 @@ func audioDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
 
 	} else {
 		// write output
-		for i := range frameCount {
-			amp, _ := ouputRing.Dequeue()
-			bits := uint16(int16(amp * math.MaxInt16))
-			binary.NativeEndian.PutUint16(inBuffer[i*2:], bits)
-		}
+		// for i := range frameCount {
+		// 	amp, _ := ouputRing.Dequeue()
+		// 	bits := uint16(int16(amp * math.MaxInt16))
+		// 	binary.NativeEndian.PutUint16(outBuffer[i*2:], bits)
+		// }
 
-		if DoLogging {
-			println("eridol-core: Wrote ", frameCount, " frames of audio output")
-		}
+		// if DoLogging {
+		// 	println("eridol-core: Wrote ", frameCount, " frames of audio output")
+		// }
 	}
 }

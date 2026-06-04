@@ -38,6 +38,11 @@ func (ring *ring[T]) PeekTail() (element T, success bool) {
 	return ring.buffer[(ring.tail)&(ring.mask())], true
 }
 
+func (ring *ring[T]) PeekRelative(index uint64) (element T, success bool) {
+	element, success = ring.Peek(index + ring.tail)
+	return
+}
+
 func (ring *ring[T]) Peek(index uint64) (element T, success bool) {
 	if ring.tail > index || index >= ring.head {
 		return element, false
@@ -53,6 +58,21 @@ func (ring *ring[T]) DropUntil(index uint64) bool {
 
 	ring.tail = max(ring.tail, index)
 	return true
+}
+
+func (ring *ring[T]) DequeueBatch(amount uint64) (elements []T, success bool) {
+	if ring.Size() < amount {
+		return nil, false
+	}
+
+	elements = make([]T, amount)
+
+	for i := range amount {
+		elements[i] = ring.buffer[ring.tail&(ring.mask())]
+		ring.tail++
+	}
+
+	return elements, true
 }
 
 func (ring *ring[T]) Dequeue() (element T, success bool) {
