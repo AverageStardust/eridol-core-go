@@ -1,19 +1,20 @@
-package main
+package "github.com/averagestardust/eridol-core-go"
 
 import (
+	"container/ring"
 	"log"
 
 	"github.com/gen2brain/malgo"
 )
 
 const sampleRate = 48000
-const periodSizeInFrames = 1000
 
 var DoLogging = false
 
 var context *malgo.AllocatedContext
 var device *malgo.Device
 var osc *oscillator
+var input *ring.Ring
 
 func Init() {
 	if context != nil {
@@ -45,7 +46,6 @@ func Init() {
 	deviceConfig.Playback.Format = malgo.FormatF32
 	deviceConfig.Playback.Channels = 1
 	deviceConfig.SampleRate = sampleRate
-	deviceConfig.PeriodSizeInFrames = periodSizeInFrames
 	deviceConfig.Alsa.NoMMap = 1
 
 	captureCallbacks := malgo.DeviceCallbacks{
