@@ -1,4 +1,4 @@
-module eridol-core-go
+module github.com/averagestardust/eridol-core-go
 
 go 1.26.3
 
