@@ -1,34 +1,41 @@
 package main
 
-import "math/cmplx"
+import (
+	"math/cmplx"
+)
 
 type OctaveSound struct {
-	B            float64
-	Ds           float64
-	Fs           float64
-	A            float64
-	Claim        float64
-	CounterClaim float64
-	Noise        float64
+	B            float32
+	Ds           float32
+	Fs           float32
+	A            float32
+	Claim        float32
+	CounterClaim float32
+	Noise        float32
 }
 
-func newOctaveSound(freqDomain []complex128) OctaveSound {
-	backgroundNoise := (cmplx.Abs(freqDomain[noise1Bin]) +
-		cmplx.Abs(freqDomain[noise2Bin]) +
-		cmplx.Abs(freqDomain[noise3Bin]) +
-		cmplx.Abs(freqDomain[noise4Bin]) +
-		cmplx.Abs(freqDomain[noise5Bin]) +
-		cmplx.Abs(freqDomain[noise6Bin])) / 6.0 * 0.8
+func newOctaveSound(freqDomain []complex64) OctaveSound {
+	backgroundNoise := (complex64Abs(freqDomain[noise1Bin]) +
+		complex64Abs(freqDomain[noise2Bin]) +
+		complex64Abs(freqDomain[noise3Bin]) +
+		complex64Abs(freqDomain[noise4Bin]) +
+		complex64Abs(freqDomain[noise5Bin]) +
+		complex64Abs(freqDomain[noise6Bin])) / 6.0 * 0.8
 
 	return OctaveSound{
-		B:            cmplx.Abs(freqDomain[bBin]) * 0.51,
-		Ds:           cmplx.Abs(freqDomain[dsBin]) * 0.78,
-		Fs:           cmplx.Abs(freqDomain[fsBin]) * 0.92,
-		Claim:        cmplx.Abs(freqDomain[claimBin]) * 1.04,
-		A:            cmplx.Abs(freqDomain[aBin]) * 1.1,
-		CounterClaim: cmplx.Abs(freqDomain[counterClaimBin]) * 1.36,
+		B:            complex64Abs(freqDomain[bBin]) * 0.51,
+		Ds:           complex64Abs(freqDomain[dsBin]) * 0.78,
+		Fs:           complex64Abs(freqDomain[fsBin]) * 0.92,
+		Claim:        complex64Abs(freqDomain[claimBin]) * 1.04,
+		A:            complex64Abs(freqDomain[aBin]) * 1.1,
+		CounterClaim: complex64Abs(freqDomain[counterClaimBin]) * 1.36,
 		Noise:        backgroundNoise,
 	}
+}
+
+func complex64Abs(n complex64) float32 {
+	// ughhh go please
+	return float32(cmplx.Abs(complex128(n)))
 }
 
 func (a OctaveSound) Add(b OctaveSound) OctaveSound {
@@ -43,7 +50,7 @@ func (a OctaveSound) Add(b OctaveSound) OctaveSound {
 	}
 }
 
-func (a OctaveSound) Scale(b float64) OctaveSound {
+func (a OctaveSound) Scale(b float32) OctaveSound {
 	return OctaveSound{
 		B:            a.B * b,
 		Ds:           a.Ds * b,
