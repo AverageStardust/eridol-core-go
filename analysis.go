@@ -11,7 +11,8 @@ import (
 
 const octaves = 6
 
-const fftSize = 374
+const fftSize = 374   // numbers of samples used in an fft run
+const fftStride = 187 // step size of sampels between fft runs
 
 const noise1Bin = 29
 const bBin = 31
@@ -27,13 +28,11 @@ const counterClaimBin = 58
 const noise6Bin = 60
 
 var inputBuffer *ring[float32]
-var inputMutex *sync.Mutex = &sync.Mutex{}
-
 var octaveBuffers [octaves]*ring[float32]
-
 var fftPlan *algofft.PlanRealT[float32, complex64]
-
 var octaveSounds [octaves]OctaveSound
+var inputMutex *sync.Mutex = &sync.Mutex{}
+var analyzeMutex *sync.Mutex = &sync.Mutex{}
 
 func init() {
 	inputBuffer = newRing[float32](1 << 13)
@@ -61,24 +60,41 @@ func enqueueData(inBuffer []byte, frameCount uint32) {
 }
 
 func analyze() {
+	analyzeMutex.Lock()
 	sampleData()
 
-	isDataRemaining := true
-	for isDataRemaining {
+	var analysisTime uint64
+
+outerLoop:
+	for {
 		for octave := octaves - 1; octave >= 0; octave-- {
-			// dequeue data
-			timeDomain, success := octaveBuffers[octave].DequeueBatch(fftSize)
+			buffer := octaveBuffers[octave]
+			sampleTime := (buffer.Tail() + fftSize/2) << (octaves - 1 - octave)
+
+			if octave == octaves-1 {
+				// allow the octave with the must frequent data to dictate the time
+				analysisTime = sampleTime
+			} else if sampleTime > analysisTime {
+				// don't do anything that is before it's time
+				continue
+			}
+
+			// get data
+			timeDomain, success := buffer.PeekBatch(buffer.Tail(), fftSize)
 
 			if !success {
 				if octave == octaves-1 {
-					isDataRemaining = false
+					// out of data
+					break outerLoop
 				}
 				break
 			}
 
+			// move forward in data
+			buffer.Drop(fftStride)
+
 			// run fft
 			freqDomain, err := applyFFT(timeDomain)
-
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -86,15 +102,14 @@ func analyze() {
 			// summerize data
 			sound := newOctaveSound(freqDomain)
 
-			if octave == 0 {
-				// don't average to make lowest octave more responsive (and less acurate)
-				octaveSounds[octave] = sound
-			} else {
-				// take average to make more acurate
-				octaveSounds[octave] = octaveSounds[octave].Add(sound).Scale(0.5)
-			}
+			// take average to make more acurate
+			octaveSounds[octave] = octaveSounds[octave].Add(sound).Scale(0.5)
+
+			sendUserCallback(octave, octaveSounds[octave], sampleTime)
 		}
 	}
+
+	analyzeMutex.Unlock()
 }
 
 // run fft on

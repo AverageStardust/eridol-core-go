@@ -22,33 +22,35 @@ func (ring *ring[T]) Tail() uint64 {
 	return ring.tail
 }
 
-func (ring *ring[T]) PeekHead() (element T, success bool) {
-	if ring.head == ring.tail {
-		return element, false
-	}
-
-	return ring.buffer[(ring.head-1)&(ring.mask())], true
-}
-
-func (ring *ring[T]) PeekTail() (element T, success bool) {
-	if ring.head == ring.tail {
-		return element, false
-	}
-
-	return ring.buffer[(ring.tail)&(ring.mask())], true
-}
-
-func (ring *ring[T]) PeekRelative(index uint64) (element T, success bool) {
-	element, success = ring.Peek(index + ring.tail)
-	return
-}
-
 func (ring *ring[T]) Peek(index uint64) (element T, success bool) {
 	if ring.tail > index || index >= ring.head {
 		return element, false
 	}
 
-	return ring.buffer[index&(ring.mask())], true
+	return ring.buffer[index&ring.mask()], true
+}
+
+func (ring *ring[T]) PeekBatch(index uint64, amount uint64) (element []T, success bool) {
+	if ring.tail > index || index+amount >= ring.head {
+		return element, false
+	}
+
+	elements := make([]T, amount)
+
+	for i := range amount {
+		elements[i] = ring.buffer[(index+i)&(ring.mask())]
+	}
+
+	return elements, true
+}
+
+func (ring *ring[T]) Drop(n uint64) bool {
+	if n > ring.Size() {
+		return false
+	}
+
+	ring.tail += n
+	return true
 }
 
 func (ring *ring[T]) DropUntil(index uint64) bool {
@@ -80,7 +82,7 @@ func (ring *ring[T]) Dequeue() (element T, success bool) {
 		return element, false
 	}
 
-	element = ring.buffer[ring.tail&(ring.mask())]
+	element = ring.buffer[ring.tail&ring.mask()]
 	ring.tail++
 
 	return element, true
@@ -95,8 +97,8 @@ func (ring *ring[T]) EnqueueBatch(elements []T) {
 		ring.grow()
 	}
 
-	startIndex := ring.head & (ring.mask())
-	endIndex := (ring.head+uint64(len(elements))-1)&(ring.mask()) + 1
+	startIndex := ring.head & ring.mask()
+	endIndex := (ring.head+uint64(len(elements))-1)&ring.mask() + 1
 
 	if startIndex > endIndex || (startIndex == endIndex && startIndex != 0) {
 		// destination looping around
@@ -115,7 +117,7 @@ func (ring *ring[T]) Enqueue(element T) {
 		ring.grow()
 	}
 
-	ring.buffer[ring.head&(ring.mask())] = element
+	ring.buffer[ring.head&ring.mask()] = element
 	ring.head++
 }
 
@@ -132,8 +134,8 @@ func (ring *ring[T]) grow() {
 		return
 	}
 
-	tailIndex := ring.tail & (ring.mask())
-	headIndex := (ring.head-1)&(ring.mask()) + 1
+	tailIndex := ring.tail & ring.mask()
+	headIndex := (ring.head-1)&ring.mask() + 1
 	newTailIndex := ring.tail & uint64(newCapacity-1)
 	newHeadIndex := (ring.head-1)&uint64(newCapacity-1) + 1
 
