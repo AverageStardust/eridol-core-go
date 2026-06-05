@@ -8,7 +8,7 @@ import (
 	"github.com/gen2brain/malgo"
 )
 
-type SoundCallback func(octave int, sound OctaveSound, sampleTime time.Duration)
+type SoundCallback func(octave int, sound OctaveSound, time time.Duration)
 
 const sampleRate = 48000
 
@@ -140,13 +140,13 @@ func audioDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
 	}
 }
 
-func sendUserCallback(octave int, sound OctaveSound, sampleTimeSamples uint64) {
+func sendUserCallback(octave int, sound OctaveSound, analysisTimeSamples uint64) {
 	callback := userCallback
 	if callback == nil {
 		return
 	}
 
 	// calculate time to the nearest microsecond (discarding some accuracy to prevent overflows)
-	sampleTimeDuration := time.Duration(sampleTimeSamples) * (time.Second / time.Microsecond) / time.Duration(sampleRate) * time.Microsecond
-	callback(octave, sound, sampleTimeDuration)
+	analysisTimeDuration := time.Duration(analysisTimeSamples) * (time.Second / time.Microsecond) / time.Duration(sampleRate) * time.Microsecond
+	callback(octave, sound, analysisTimeDuration)
 }

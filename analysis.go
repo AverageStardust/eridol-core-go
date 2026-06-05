@@ -30,6 +30,7 @@ const noise6Bin = 60
 var inputBuffer *ring[float32]
 var octaveBuffers [octaves]*ring[float32]
 var fftPlan *algofft.PlanRealT[float32, complex64]
+var analysisTime uint64
 var octaveSounds [octaves]OctaveSound
 var inputMutex *sync.Mutex = &sync.Mutex{}
 var analyzeMutex *sync.Mutex = &sync.Mutex{}
@@ -62,8 +63,6 @@ func enqueueData(inBuffer []byte, frameCount uint32) {
 func analyze() {
 	analyzeMutex.Lock()
 	sampleData()
-
-	var analysisTime uint64
 
 outerLoop:
 	for {
@@ -105,7 +104,7 @@ outerLoop:
 			// take average to make more acurate
 			octaveSounds[octave] = octaveSounds[octave].Add(sound).Scale(0.5)
 
-			sendUserCallback(octave, octaveSounds[octave], sampleTime)
+			sendUserCallback(octave, octaveSounds[octave], analysisTime)
 		}
 	}
 
