@@ -50,7 +50,7 @@ func enqueueData(inBuffer []byte, frameCount uint32) {
 }
 
 func analyze() {
-	sampleDate()
+	sampleData()
 
 analysisLoop:
 	for {
@@ -59,7 +59,7 @@ analysisLoop:
 			timeDomain, success := octaveBuffers[octave].DequeueBatch(fftSize)
 
 			if !success {
-				if octave == 5 {
+				if octave == octaves-1 {
 					break analysisLoop
 				} else {
 					break
@@ -67,7 +67,7 @@ analysisLoop:
 			}
 
 			// run fft
-			freqDomain := fft.FFTReal(timeDomain)
+			freqDomain := applyFFT(timeDomain)
 
 			// summerize data
 			sound := newOctaveSound(freqDomain)
@@ -77,14 +77,19 @@ analysisLoop:
 				octaveSounds[octave] = sound
 			} else {
 				// take average to make more acurate
-				octaveSounds[octave] = octaveSounds[octave].add(sound).scale(0.5)
+				octaveSounds[octave] = octaveSounds[octave].Add(sound).Scale(0.5)
 			}
 		}
 	}
 }
 
-// get enough data from the ring buffer to do FFTs for each octave
-func sampleDate() {
+// run fft on
+func applyFFT(timeDomain []float64) []complex128 {
+	return fft.FFTReal(timeDomain)
+}
+
+// downsample data from the input buffer into a buffer ideal for each octave
+func sampleData() {
 	// take an amount of data that can be downsampled evenly, discard the extra
 	usableSampleCount := int(inputBuffer.Size()) & (-1 << (octaves - 1))
 
@@ -114,28 +119,4 @@ func halfDownSample(input []float64) []float64 {
 	}
 
 	return output
-}
-
-func (a OctaveSound) add(b OctaveSound) OctaveSound {
-	return OctaveSound{
-		B:            a.B + b.B,
-		Ds:           a.Ds + b.Ds,
-		Fs:           a.Fs + b.Fs,
-		A:            a.A + b.A,
-		Claim:        a.Claim + b.Claim,
-		CounterClaim: a.CounterClaim + b.CounterClaim,
-		Noise:        a.Noise + b.Noise,
-	}
-}
-
-func (a OctaveSound) scale(b float64) OctaveSound {
-	return OctaveSound{
-		B:            a.B * b,
-		Ds:           a.Ds * b,
-		Fs:           a.Fs * b,
-		A:            a.A * b,
-		Claim:        a.Claim * b,
-		CounterClaim: a.CounterClaim * b,
-		Noise:        a.Noise * b,
-	}
 }
