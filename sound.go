@@ -2,9 +2,12 @@ package main
 
 import (
 	"math/cmplx"
+	"time"
 )
 
-type OctaveSound struct {
+type SoundCallback func(octaves [OctaveCount]Sound, analysisTime time.Duration)
+
+type Sound struct {
 	B            float32
 	Ds           float32
 	Fs           float32
@@ -14,7 +17,7 @@ type OctaveSound struct {
 	Noise        float32
 }
 
-func newOctaveSound(freqDomain []complex64) OctaveSound {
+func newSound(freqDomain []complex64) Sound {
 	backgroundNoise := (complex64Abs(freqDomain[noise1Bin]) +
 		complex64Abs(freqDomain[noise2Bin]) +
 		complex64Abs(freqDomain[noise3Bin]) +
@@ -22,7 +25,7 @@ func newOctaveSound(freqDomain []complex64) OctaveSound {
 		complex64Abs(freqDomain[noise5Bin]) +
 		complex64Abs(freqDomain[noise6Bin])) / 6.0 * 0.8
 
-	return OctaveSound{
+	return Sound{
 		B:            complex64Abs(freqDomain[bBin]) * 0.51,
 		Ds:           complex64Abs(freqDomain[dsBin]) * 0.78,
 		Fs:           complex64Abs(freqDomain[fsBin]) * 0.92,
@@ -38,8 +41,8 @@ func complex64Abs(n complex64) float32 {
 	return float32(cmplx.Abs(complex128(n)))
 }
 
-func (a OctaveSound) Add(b OctaveSound) OctaveSound {
-	return OctaveSound{
+func (a Sound) Add(b Sound) Sound {
+	return Sound{
 		B:            a.B + b.B,
 		Ds:           a.Ds + b.Ds,
 		Fs:           a.Fs + b.Fs,
@@ -50,8 +53,8 @@ func (a OctaveSound) Add(b OctaveSound) OctaveSound {
 	}
 }
 
-func (a OctaveSound) Scale(b float32) OctaveSound {
-	return OctaveSound{
+func (a Sound) Scale(b float32) Sound {
+	return Sound{
 		B:            a.B * b,
 		Ds:           a.Ds * b,
 		Fs:           a.Fs * b,

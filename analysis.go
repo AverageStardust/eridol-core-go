@@ -9,8 +9,6 @@ import (
 	algofft "github.com/cwbudde/algo-fft"
 )
 
-const octaves = 6
-
 const fftSize = 374   // numbers of samples used in an fft run
 const fftStride = 187 // step size of sampels between fft runs
 
@@ -28,19 +26,26 @@ const counterClaimBin = 58
 const noise6Bin = 60
 
 var inputBuffer *ring[float32]
-var octaveBuffers [octaves]*ring[float32]
+var octaveBuffers [OctaveCount]*ring[float32]
 var fftPlan *algofft.PlanRealT[float32, complex64]
 var analysisTime uint64
-var octaveSounds [octaves]OctaveSound
+var octaveSounds [OctaveCount]Sound
+var octaveChanged [OctaveCount]bool
 var inputMutex *sync.Mutex = &sync.Mutex{}
 var analyzeMutex *sync.Mutex = &sync.Mutex{}
+
+// return if the octave's sound/notes changed before the last callback
+// higher frequency octaves are updated more often because their notes can be detected faster
+func IsOctaveUpdated(octave int) bool {
+	return octaveChanged[octave]
+}
 
 func init() {
 	inputBuffer = newRing[float32](1 << 13)
 
-	for i := range octaves {
+	for i := range OctaveCount {
 		octaveBuffers[i] = newRing[float32](1 << 13)
-		octaveSounds[i] = OctaveSound{}
+		octaveSounds[i] = Sound{}
 	}
 
 	var err error
@@ -66,11 +71,15 @@ func analyze() {
 
 outerLoop:
 	for {
-		for octave := octaves - 1; octave >= 0; octave-- {
-			buffer := octaveBuffers[octave]
-			sampleTime := (buffer.Tail() + fftSize/2) << (octaves - 1 - octave)
+		for i := range OctaveCount {
+			octaveChanged[i] = false
+		}
 
-			if octave == octaves-1 {
+		for octave := OctaveCount - 1; octave >= 0; octave-- {
+			buffer := octaveBuffers[octave]
+			sampleTime := (buffer.Tail() + fftSize/2) << (OctaveCount - 1 - octave)
+
+			if octave == OctaveCount-1 {
 				// allow the octave with the must frequent data to dictate the time
 				analysisTime = sampleTime
 			} else if sampleTime > analysisTime {
@@ -82,7 +91,7 @@ outerLoop:
 			timeDomain, success := buffer.PeekBatch(buffer.Tail(), fftSize)
 
 			if !success {
-				if octave == octaves-1 {
+				if octave == OctaveCount-1 {
 					// out of data
 					break outerLoop
 				}
@@ -98,14 +107,16 @@ outerLoop:
 				log.Fatal(err)
 			}
 
-			// summerize data
-			sound := newOctaveSound(freqDomain)
+			if DoLogging {
+				println("eridol-core: Ran fft for octave ", octave)
+			}
 
-			// take average to make more acurate
-			octaveSounds[octave] = octaveSounds[octave].Add(sound).Scale(0.5)
-
-			sendUserCallback(octave, octaveSounds[octave], analysisTime)
+			// categorize bins
+			octaveSounds[octave] = newSound(freqDomain)
+			octaveChanged[octave] = true
 		}
+
+		sendUserCallback(octaveSounds, analysisTime)
 	}
 
 	analyzeMutex.Unlock()
@@ -122,21 +133,21 @@ func applyFFT(timeDomain []float32) (freqDomain []complex64, err error) {
 // downsample data from the input buffer into a buffer ideal for each octave
 func sampleData() {
 	// take an amount of data that can be downsampled evenly, discard the extra
-	usableSampleCount := int(inputBuffer.Size()) & (-1 << (octaves - 1))
+	usableSampleCount := int(inputBuffer.Size()) & (-1 << (OctaveCount - 1))
 
 	inputMutex.Lock()
 	usableSampels, _ := inputBuffer.DequeueBatch(uint64(usableSampleCount))
 	inputMutex.Unlock()
 
-	samplings := make([][]float32, octaves)
-	samplings[octaves-1] = usableSampels
+	samplings := make([][]float32, OctaveCount)
+	samplings[OctaveCount-1] = usableSampels
 
 	// create different down-samplings at an idea sampling rate for each octave
-	for i := octaves - 1; i > 0; i-- {
+	for i := OctaveCount - 1; i > 0; i-- {
 		samplings[i-1] = halfDownSample(samplings[i])
 	}
 
-	for i := range octaves {
+	for i := range OctaveCount {
 		octaveBuffers[i].EnqueueBatch(samplings[i])
 	}
 }
