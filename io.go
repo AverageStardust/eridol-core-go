@@ -1,21 +1,14 @@
-package main
+package core
 
 import (
 	"encoding/binary"
 	"log"
-	"time"
 
 	"github.com/gen2brain/malgo"
 )
 
-const OctaveCount = 6
-const sampleRate = 48000
-
-var DoLogging = false
-
 var context *malgo.AllocatedContext
 var device *malgo.Device
-var userSoundCallback SoundCallback
 
 func Init() {
 	if context != nil {
@@ -74,31 +67,6 @@ func Init() {
 	}
 }
 
-// Runs the callback every time new sound data is avalable for at least one octave.
-// Sound data just has raw numbers for the loudness of each note/tone as well as background noise.
-// If you want this analyzed into notes use OnNotes().
-// The callback is called off of the main thread/goroutine.
-func OnSound(callback SoundCallback) {
-	userSoundCallback = callback
-}
-
-// Runs the callback every time new note data is avalable for at least one octave.
-// Note data has already be analized into boolean on/off values for each note.
-// If you want raw sound data use OnSound().
-// The callback is called off of the main thread/goroutine.
-func OnNotes(callback NotesCallback) {
-	OnNotesWithThreshhold(callback, 5)
-}
-
-// Runs the callback every time new note data is avalable for at least one octave.
-// Higher values of signalThreshold be less sensative to quite notes, but less likey to cause false positive detections.
-// Note data has already be analized into boolean on/off values for each note.
-// If you want raw sound data use OnSound().
-// The callback is called off of the main thread/goroutine.
-func OnNotesWithThreshhold(callback NotesCallback, signalThreshold float32) {
-	userSoundCallback = createNoteAnalyzer(callback, signalThreshold)
-}
-
 func Uninit() {
 	if device != nil {
 		device.Uninit()
@@ -133,7 +101,7 @@ func audioDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
 		println("eridol-core: Read ", frameCount, " frames of audio input")
 	}
 
-	go analyze()
+	go analyzeData()
 
 	if true {
 		// fill zeros
@@ -158,15 +126,4 @@ func audioDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
 		// 	println("eridol-core: Wrote ", frameCount, " frames of audio output")
 		// }
 	}
-}
-
-func sendUserCallback(octaves [OctaveCount]Sound, analysisTimeSamples uint64) {
-	callback := userSoundCallback
-	if callback == nil {
-		return
-	}
-
-	// calculate time to the nearest microsecond (discarding some accuracy to prevent overflows)
-	analysisTimeDuration := time.Duration(analysisTimeSamples) * (time.Second / time.Microsecond) / time.Duration(sampleRate) * time.Microsecond
-	callback(octaves, analysisTimeDuration)
 }

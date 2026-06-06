@@ -1,7 +1,6 @@
-package main
+package core
 
 import (
-	"math/cmplx"
 	"time"
 )
 
@@ -15,30 +14,6 @@ type Sound struct {
 	Claim        float32
 	CounterClaim float32
 	Noise        float32
-}
-
-func newSound(freqDomain []complex64) Sound {
-	backgroundNoise := (complex64Abs(freqDomain[noise1Bin]) +
-		complex64Abs(freqDomain[noise2Bin]) +
-		complex64Abs(freqDomain[noise3Bin]) +
-		complex64Abs(freqDomain[noise4Bin]) +
-		complex64Abs(freqDomain[noise5Bin]) +
-		complex64Abs(freqDomain[noise6Bin])) / 6.0 * 0.8
-
-	return Sound{
-		B:            complex64Abs(freqDomain[bBin]) * 0.51,
-		Ds:           complex64Abs(freqDomain[dsBin]) * 0.78,
-		Fs:           complex64Abs(freqDomain[fsBin]) * 0.92,
-		Claim:        complex64Abs(freqDomain[claimBin]) * 1.04,
-		A:            complex64Abs(freqDomain[aBin]) * 1.1,
-		CounterClaim: complex64Abs(freqDomain[counterClaimBin]) * 1.36,
-		Noise:        backgroundNoise,
-	}
-}
-
-func complex64Abs(n complex64) float32 {
-	// ughhh go please
-	return float32(cmplx.Abs(complex128(n)))
 }
 
 func (a Sound) Add(b Sound) Sound {

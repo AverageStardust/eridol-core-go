@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"encoding/binary"
@@ -7,26 +7,15 @@ import (
 	"sync"
 
 	algofft "github.com/cwbudde/algo-fft"
+
+	ring "github.com/averagestardust/eridol-core-go/internal/ring"
 )
 
-const fftSize = 374   // numbers of samples used in an fft run
-const fftStride = 187 // step size of sampels between fft runs
+const fftSize = 252   // numbers of samples used in an fft run
+const fftStride = 126 // step size of sampels between fft runs
 
-const noise1Bin = 29
-const bBin = 31
-const noise2Bin = 34
-const noise3Bin = 36
-const dsBin = 39
-const noise4Bin = 42
-const noise5Bin = 43
-const fsBin = 46
-const claimBin = 52
-const aBin = 55
-const counterClaimBin = 58
-const noise6Bin = 60
-
-var inputBuffer *ring[float32]
-var octaveBuffers [OctaveCount]*ring[float32]
+var inputBuffer *ring.Ring[float32]
+var octaveBuffers [OctaveCount]*ring.Ring[float32]
 var fftPlan *algofft.PlanRealT[float32, complex64]
 var analysisTime uint64
 var octaveSounds [OctaveCount]Sound
@@ -41,10 +30,10 @@ func IsOctaveUpdated(octave int) bool {
 }
 
 func init() {
-	inputBuffer = newRing[float32](1 << 13)
+	inputBuffer = ring.NewRing[float32](1 << 13)
 
 	for i := range OctaveCount {
-		octaveBuffers[i] = newRing[float32](1 << 13)
+		octaveBuffers[i] = ring.NewRing[float32](1 << 13)
 		octaveSounds[i] = Sound{}
 	}
 
@@ -65,7 +54,7 @@ func enqueueData(inBuffer []byte, frameCount uint32) {
 	inputMutex.Unlock()
 }
 
-func analyze() {
+func analyzeData() {
 	analyzeMutex.Lock()
 	sampleData()
 
@@ -112,7 +101,7 @@ outerLoop:
 			}
 
 			// categorize bins
-			octaveSounds[octave] = newSound(freqDomain)
+			octaveSounds[octave] = catagorizeSound(freqDomain)
 			octaveChanged[octave] = true
 		}
 

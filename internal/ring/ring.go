@@ -1,28 +1,28 @@
-package main
+package ring
 
-type ring[T any] struct {
+type Ring[T any] struct {
 	buffer []T
 	head   uint64
 	tail   uint64
 }
 
-func newRing[T any](initalSize int) *ring[T] {
-	return &ring[T]{
+func NewRing[T any](initalSize int) *Ring[T] {
+	return &Ring[T]{
 		buffer: make([]T, initalSize),
 		head:   0,
 		tail:   0,
 	}
 }
 
-func (ring *ring[T]) Head() uint64 {
+func (ring *Ring[T]) Head() uint64 {
 	return ring.head
 }
 
-func (ring *ring[T]) Tail() uint64 {
+func (ring *Ring[T]) Tail() uint64 {
 	return ring.tail
 }
 
-func (ring *ring[T]) Peek(index uint64) (element T, success bool) {
+func (ring *Ring[T]) Peek(index uint64) (element T, success bool) {
 	if ring.tail > index || index >= ring.head {
 		return element, false
 	}
@@ -30,7 +30,7 @@ func (ring *ring[T]) Peek(index uint64) (element T, success bool) {
 	return ring.buffer[index&ring.mask()], true
 }
 
-func (ring *ring[T]) PeekBatch(index uint64, amount uint64) (element []T, success bool) {
+func (ring *Ring[T]) PeekBatch(index uint64, amount uint64) (element []T, success bool) {
 	if ring.tail > index || index+amount >= ring.head {
 		return element, false
 	}
@@ -44,7 +44,7 @@ func (ring *ring[T]) PeekBatch(index uint64, amount uint64) (element []T, succes
 	return elements, true
 }
 
-func (ring *ring[T]) Drop(n uint64) bool {
+func (ring *Ring[T]) Drop(n uint64) bool {
 	if n > ring.Size() {
 		return false
 	}
@@ -53,7 +53,7 @@ func (ring *ring[T]) Drop(n uint64) bool {
 	return true
 }
 
-func (ring *ring[T]) DropUntil(index uint64) bool {
+func (ring *Ring[T]) DropUntil(index uint64) bool {
 	if index > ring.head {
 		return false
 	}
@@ -62,7 +62,7 @@ func (ring *ring[T]) DropUntil(index uint64) bool {
 	return true
 }
 
-func (ring *ring[T]) DequeueBatch(amount uint64) (elements []T, success bool) {
+func (ring *Ring[T]) DequeueBatch(amount uint64) (elements []T, success bool) {
 	if ring.Size() < amount {
 		return nil, false
 	}
@@ -77,7 +77,7 @@ func (ring *ring[T]) DequeueBatch(amount uint64) (elements []T, success bool) {
 	return elements, true
 }
 
-func (ring *ring[T]) Dequeue() (element T, success bool) {
+func (ring *Ring[T]) Dequeue() (element T, success bool) {
 	if ring.tail == ring.head {
 		return element, false
 	}
@@ -88,7 +88,7 @@ func (ring *ring[T]) Dequeue() (element T, success bool) {
 	return element, true
 }
 
-func (ring *ring[T]) EnqueueBatch(elements []T) {
+func (ring *Ring[T]) EnqueueBatch(elements []T) {
 	if len(elements) == 0 {
 		return
 	}
@@ -112,7 +112,7 @@ func (ring *ring[T]) EnqueueBatch(elements []T) {
 	ring.head += uint64(len(elements))
 }
 
-func (ring *ring[T]) Enqueue(element T) {
+func (ring *Ring[T]) Enqueue(element T) {
 	if ring.Size() == uint64(cap(ring.buffer)) {
 		ring.grow()
 	}
@@ -121,11 +121,11 @@ func (ring *ring[T]) Enqueue(element T) {
 	ring.head++
 }
 
-func (ring *ring[T]) Size() uint64 {
+func (ring *Ring[T]) Size() uint64 {
 	return ring.head - ring.tail
 }
 
-func (ring *ring[T]) grow() {
+func (ring *Ring[T]) grow() {
 	newCapacity := cap(ring.buffer) * 2
 	newBuffer := make([]T, newCapacity)
 
@@ -157,6 +157,6 @@ func (ring *ring[T]) grow() {
 	ring.buffer = newBuffer
 }
 
-func (ring *ring[T]) mask() uint64 {
+func (ring *Ring[T]) mask() uint64 {
 	return uint64(cap(ring.buffer)) - 1
 }
