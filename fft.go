@@ -8,20 +8,24 @@ import (
 
 	algofft "github.com/cwbudde/algo-fft"
 
-	ring "github.com/averagestardust/eridol-core-go/internal/ring"
+	"github.com/averagestardust/eridol-core-go/internal"
 )
 
 const fftSize = 252   // numbers of samples used in an fft run
 const fftStride = 126 // step size of sampels between fft runs
 
-var inputBuffer *ring.Ring[float32]
-var octaveBuffers [OctaveCount]*ring.Ring[float32]
+var inputBuffer *internal.Ring[float32]
+var octaveBuffers [OctaveCount]*internal.Ring[float32]
+
+var inputMutex = sync.Mutex{}
+var analyzeMutex = sync.Mutex{}
+
 var fftPlan *algofft.PlanRealT[float32, complex64]
-var analysisTime uint64
+
+var fftSamples uint64
+
 var octaveSounds [OctaveCount]Sound
 var octaveChanged [OctaveCount]bool
-var inputMutex *sync.Mutex = &sync.Mutex{}
-var analyzeMutex *sync.Mutex = &sync.Mutex{}
 
 // return if the octave's sound/notes changed before the last callback
 // higher frequency octaves are updated more often because their notes can be detected faster
@@ -30,10 +34,10 @@ func IsOctaveUpdated(octave int) bool {
 }
 
 func init() {
-	inputBuffer = ring.NewRing[float32](1 << 13)
+	inputBuffer = internal.NewRing[float32](1 << 13)
 
 	for i := range OctaveCount {
-		octaveBuffers[i] = ring.NewRing[float32](1 << 13)
+		octaveBuffers[i] = internal.NewRing[float32](1 << 13)
 		octaveSounds[i] = Sound{}
 	}
 
@@ -52,6 +56,10 @@ func enqueueData(inBuffer []byte, frameCount uint32) {
 		inputBuffer.Enqueue(amp)
 	}
 	inputMutex.Unlock()
+
+	if DoLogging {
+		log.Println("eridol-core: Read ", frameCount, " frames of audio input")
+	}
 }
 
 func analyzeData() {
@@ -70,8 +78,8 @@ outerLoop:
 
 			if octave == OctaveCount-1 {
 				// allow the octave with the must frequent data to dictate the time
-				analysisTime = sampleTime
-			} else if sampleTime > analysisTime {
+				fftSamples = sampleTime
+			} else if sampleTime > fftSamples {
 				// don't do anything that is before it's time
 				continue
 			}
@@ -96,16 +104,12 @@ outerLoop:
 				log.Fatal(err)
 			}
 
-			if DoLogging {
-				println("eridol-core: Ran fft for octave ", octave)
-			}
-
 			// categorize bins
 			octaveSounds[octave] = catagorizeSound(freqDomain)
 			octaveChanged[octave] = true
 		}
 
-		sendUserCallback(octaveSounds, analysisTime)
+		sendUserCallback(octaveSounds, fftSamples)
 	}
 
 	analyzeMutex.Unlock()

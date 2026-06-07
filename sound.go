@@ -1,11 +1,5 @@
 package core
 
-import (
-	"time"
-)
-
-type SoundCallback func(octaves [OctaveCount]Sound, analysisTime time.Duration)
-
 type Sound struct {
 	B            float32
 	Ds           float32

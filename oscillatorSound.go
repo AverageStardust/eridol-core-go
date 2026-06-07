@@ -1,8 +1,8 @@
-package oscillator
+package core
 
 import "math"
 
-type octaveSound struct {
+type oscillatorSound struct {
 	B            float32
 	Ds           float32
 	Fs           float32
@@ -11,7 +11,7 @@ type octaveSound struct {
 	CounterClaim float32
 }
 
-func (sound octaveSound) Sample(time float64, octave int) (amplitude float32) {
+func (sound oscillatorSound) sample(time float64, octave int) (amplitude float32) {
 	amplitude = sampleSinOscillator(time, 123.47, octave) * sound.B
 	amplitude += sampleSinOscillator(time, 155.56, octave) * sound.Ds
 	amplitude += sampleSinOscillator(time, 185.00, octave) * sound.Fs
@@ -28,6 +28,33 @@ func sampleSinOscillator(time float64, baseFrequency float64, octave int) float3
 	return float32(math.Sin(phase * math.Pi * 2))
 }
 
-func (sound octaveSound) TotalAmplitude() float32 {
+func (sound *oscillatorSound) stepTo(notes Notes, stepSize float32) {
+	stepSoundNoteTo(&sound.B, notes.B, stepSize)
+	stepSoundNoteTo(&sound.Ds, notes.Ds, stepSize)
+	stepSoundNoteTo(&sound.Fs, notes.Fs, stepSize)
+	stepSoundNoteTo(&sound.A, notes.A, stepSize)
+	stepSoundNoteTo(&sound.Claim, notes.Claim, stepSize)
+	stepSoundNoteTo(&sound.CounterClaim, notes.CounterClaim, stepSize)
+}
+
+func stepSoundNoteTo(soundNote *float32, note bool, step float32) {
+	if note {
+		if *soundNote < 1 {
+			*soundNote += step
+			if *soundNote > 1 {
+				*soundNote = 1
+			}
+		}
+	} else {
+		if *soundNote > 0 {
+			*soundNote -= step
+			if *soundNote < 0 {
+				*soundNote = 0
+			}
+		}
+	}
+}
+
+func (sound oscillatorSound) maxAmplitude() float32 {
 	return sound.B + sound.Ds + sound.Fs + sound.A + sound.Claim + sound.CounterClaim
 }

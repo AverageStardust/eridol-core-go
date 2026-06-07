@@ -1,4 +1,4 @@
-package ring
+package internal
 
 type Ring[T any] struct {
 	buffer []T
@@ -60,6 +60,10 @@ func (ring *Ring[T]) DropUntil(index uint64) bool {
 
 	ring.tail = max(ring.tail, index)
 	return true
+}
+
+func (ring *Ring[T]) DropAll() {
+	ring.tail = ring.head
 }
 
 func (ring *Ring[T]) DequeueBatch(amount uint64) (elements []T, success bool) {

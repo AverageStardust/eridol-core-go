@@ -4,18 +4,11 @@ import (
 	"time"
 )
 
+type SoundCallback func(octaves [OctaveCount]Sound, runtime time.Duration)
+
+type NotesCallback func(octaves [OctaveCount]Notes, runtime time.Duration)
+
 var userCallback SoundCallback
-
-func sendUserCallback(octaves [OctaveCount]Sound, analysisTimeSamples uint64) {
-	callback := userCallback
-	if callback == nil {
-		return
-	}
-
-	// calculate time to the nearest microsecond (discarding some accuracy to prevent overflows)
-	analysisTimeDuration := time.Duration(analysisTimeSamples) * (time.Second / time.Microsecond) / time.Duration(sampleRate) * time.Microsecond
-	callback(octaves, analysisTimeDuration)
-}
 
 // Runs the callback every time new sound data is avalable for at least one octave.
 // Sound data just has raw numbers for the loudness of each note/tone as well as background noise.
@@ -40,4 +33,22 @@ func OnNotes(callback NotesCallback) {
 // The callback is called off of the main thread/goroutine.
 func OnNotesWithThreshhold(callback NotesCallback, signalThreshold float32) {
 	userCallback = createNoteAnalyzer(callback, signalThreshold)
+}
+
+func sendUserCallback(octaves [OctaveCount]Sound, analysisSamples uint64) {
+	callback := userCallback
+	if callback == nil {
+		return
+	}
+
+	// calculate time to the nearest microsecond (discarding some accuracy to prevent overflows)
+	callback(octaves, analysisSamplesToRuntime(analysisSamples))
+}
+
+func analysisSamplesToRuntime(analysisSamples uint64) time.Duration {
+	return time.Duration(analysisSamples) * (time.Second / time.Microsecond) / time.Duration(sampleRate) * time.Microsecond
+}
+
+func runtimeToAnalysisSamples(runtime time.Duration) uint64 {
+	return uint64(runtime / time.Microsecond * time.Duration(sampleRate) / (time.Second / time.Microsecond))
 }

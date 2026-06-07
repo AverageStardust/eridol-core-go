@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"log"
 
 	"github.com/gen2brain/malgo"
@@ -10,6 +9,7 @@ import (
 var context *malgo.AllocatedContext
 var device *malgo.Device
 
+// Sets up the sound library to listen and play.
 func Init() {
 	if context != nil {
 		return
@@ -18,7 +18,7 @@ func Init() {
 	var err error
 	context, err = malgo.InitContext(nil, malgo.ContextConfig{}, func(message string) {
 		if DoLogging {
-			println("miniaudio: ", message)
+			log.Println("miniaudio: ", message)
 		}
 	})
 	if err != nil {
@@ -26,12 +26,7 @@ func Init() {
 	}
 
 	if DoLogging {
-		println("eridol-core: Created malgo context")
-	}
-
-	if device != nil {
-		device.Uninit()
-		println("eridol-core: Released malgo device")
+		log.Println("eridol-core: Created malgo context")
 	}
 
 	deviceConfig := malgo.DefaultDeviceConfig(malgo.Duplex)
@@ -39,22 +34,18 @@ func Init() {
 	deviceConfig.Capture.Channels = 1
 	deviceConfig.Playback.Format = malgo.FormatS16
 	deviceConfig.Playback.Channels = 1
-	deviceConfig.SampleRate = sampleRate
 	deviceConfig.NoPreSilencedOutputBuffer = 1
 	deviceConfig.NoClip = 1
-	deviceConfig.Alsa.NoMMap = 1
 
-	captureCallbacks := malgo.DeviceCallbacks{
-		Data: audioDataCallback,
-	}
-
-	device, err := malgo.InitDevice(context.Context, deviceConfig, captureCallbacks)
+	device, err = malgo.InitDevice(context.Context, deviceConfig, malgo.DeviceCallbacks{
+		Data: deviceDataCallback,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if DoLogging {
-		println("eridol-core: Created malgo device")
+		log.Println("eridol-core: Created malgo device")
 	}
 
 	err = device.Start()
@@ -63,11 +54,21 @@ func Init() {
 	}
 
 	if DoLogging {
-		println("eridol-core: Started malgo device")
+		log.Println("eridol-core: Started malgo device")
 	}
 }
 
+// Closes all oscillators and waits for them to go silent.
+// Then closes the sound library.
 func Uninit() {
+	if isClosingOscillators() {
+		return
+	}
+
+	closeOscillators(finishUninit)
+}
+
+func finishUninit() {
 	if device != nil {
 		device.Uninit()
 
@@ -87,43 +88,20 @@ func Uninit() {
 		context.Free()
 
 		if DoLogging {
-			println("eridol-core: Released malgo context")
+			log.Println("eridol-core: Released malgo context")
 		}
 
 		context = nil
 	}
 }
 
-func audioDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
+func deviceDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
+	// write output
+	writeOscillators(outBuffer, int(frameCount))
+
 	// read input
 	enqueueData(inBuffer, frameCount)
-	if DoLogging {
-		println("eridol-core: Read ", frameCount, " frames of audio input")
-	}
 
+	// start analyze
 	go analyzeData()
-
-	if true {
-		// fill zeros
-		for i := range frameCount {
-			bits := uint16(int16(0))
-			binary.NativeEndian.PutUint16(outBuffer[i*2:], bits)
-		}
-
-		if DoLogging {
-			println("eridol-core: Zeroed ", frameCount, " frames of audio output")
-		}
-
-	} else {
-		// write output
-		// for i := range frameCount {
-		// 	amp, _ := ouputRing.Dequeue()
-		// 	bits := uint16(int16(amp * math.MaxInt16))
-		// 	binary.NativeEndian.PutUint16(outBuffer[i*2:], bits)
-		// }
-
-		// if DoLogging {
-		// 	println("eridol-core: Wrote ", frameCount, " frames of audio output")
-		// }
-	}
 }
