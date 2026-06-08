@@ -23,7 +23,6 @@ type Synthesizer struct {
 	plans           *internal.Ring[synthPlan]
 	samplesIntoPlan uint64
 	mutex           sync.Mutex
-	onSilenced      chan struct{}
 }
 
 const synthFadeSpeed = 0.001
@@ -39,15 +38,6 @@ func newSynth(octave int) (synth *Synthesizer) {
 		octave: octave,
 		plans:  internal.NewRing[synthPlan](256),
 	}
-}
-
-func (synth *Synthesizer) silenceAndMessage(onSilenced chan struct{}) {
-	synth.mutex.Lock()
-	defer synth.mutex.Unlock()
-
-	synth.immediateNotes = Notes{}
-	synth.plans.DropAll()
-	synth.onSilenced = onSilenced
 }
 
 // Silences everything, stopping immediate notes and canceling all planned notes.
@@ -169,10 +159,6 @@ func (synth *Synthesizer) sample(timeSamples uint64) (amplitude float32, maxAmpl
 
 	amplitude = synth.currentSound.sample(time, synth.octave)
 	maxAmplitude = synth.currentSound.maxAmplitude()
-
-	if maxAmplitude == 0 && synth.onSilenced != nil {
-		synth.onSilenced <- struct{}{}
-	}
 
 	return
 }

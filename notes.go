@@ -36,6 +36,19 @@ func (a Notes) Union(b Notes) Notes {
 	}
 }
 
+// Returns the intersection of both sets of notes.
+// An output note will be playing if it is playing in both input sets.
+func (a Notes) Intersection(b Notes) Notes {
+	return Notes{
+		B:            a.B && b.B,
+		Ds:           a.Ds && b.Ds,
+		Fs:           a.Fs && b.Fs,
+		A:            a.A && b.A,
+		Claim:        a.Claim && b.Claim,
+		CounterClaim: a.CounterClaim && b.CounterClaim,
+	}
+}
+
 // Returns the set of notes with one note set to playing.
 func (notes Notes) With(note Note) Notes {
 	return notes.Set(note, true)
