@@ -2,7 +2,7 @@
 
 Module eridol-core-go provides a basic interface to build an eridol implementation. It provides oscillators and FFT suited for Eridol, so you don't have to worry about what "hearing" or "playing" a note means exactly.
 
-## Get started
+## Getting Started
 You should read through the [docs](https://pkg.go.dev/github.com/averagestardust/eridol-core-go).
 
 The following example program keeps ownership of octave 2 by playing the counter-claim tone.
