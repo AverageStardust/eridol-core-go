@@ -22,6 +22,10 @@ func newIO(runFFT func(soundQuanta)) (stop func() error, err error) {
 	}
 
 	device, err := initDevice(context.Context, func(outBuffer, inBuffer []byte, frameCount uint32) {
+		if doLogging {
+			log.Println("eridolcore: Received quanta of microphone data.")
+		}
+
 		// start fft analyzer
 		runFFT(soundQuanta{
 			buffer:     inBuffer,

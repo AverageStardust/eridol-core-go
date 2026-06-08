@@ -57,11 +57,14 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 	}
 
 	if doLogging {
-		log.Println("eridolcore: Ready to run user callback.")
+		log.Println("eridolcore: Waiting to run user callback.")
 	}
 
 	// run until callback tells us to stop
 	for !stopping {
+		if doLogging {
+			log.Println("eridolcore: Running user callback.")
+		}
 		stopping = callback(<-heardFFT)
 	}
 
