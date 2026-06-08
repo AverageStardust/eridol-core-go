@@ -1,6 +1,8 @@
 package core
 
-func newNoteAnalyzer(callback UserCallback, signalThreshold float32) UserCallbackRaw {
+const signalThreshold = 3.8
+
+func newNoteAnalyzer(callback UserCallback) UserCallbackRaw {
 	var consistentNotes [OctaveCount]Notes
 	var lastAnalyzedNotes [OctaveCount]Notes
 	var lastRawOctaves [OctaveCount]RawSound
@@ -19,12 +21,12 @@ func newNoteAnalyzer(callback UserCallback, signalThreshold float32) UserCallbac
 
 			// check that
 			analyzedNotes[octave] = Notes{
-				B:            averagedOctave.B/averagedOctave.Noise > signalThreshold,
-				Ds:           averagedOctave.Ds/averagedOctave.Noise > signalThreshold,
-				Fs:           averagedOctave.Fs/averagedOctave.Noise > signalThreshold,
-				A:            averagedOctave.A/averagedOctave.Noise > signalThreshold,
-				Claim:        averagedOctave.Claim/averagedOctave.Noise > signalThreshold,
-				CounterClaim: averagedOctave.CounterClaim/averagedOctave.Noise > signalThreshold,
+				B:            (averagedOctave.B-averagedOctave.BackgroundNoise)/averagedOctave.BNoise > signalThreshold,
+				Ds:           (averagedOctave.Ds-averagedOctave.BackgroundNoise)/averagedOctave.DsNoise > signalThreshold,
+				Fs:           (averagedOctave.Fs-averagedOctave.BackgroundNoise)/averagedOctave.FsNoise > signalThreshold,
+				A:            (averagedOctave.A-averagedOctave.BackgroundNoise)/averagedOctave.ANoise > signalThreshold,
+				Claim:        (averagedOctave.Claim-averagedOctave.BackgroundNoise)/averagedOctave.ClaimNoise > signalThreshold,
+				CounterClaim: (averagedOctave.CounterClaim-averagedOctave.BackgroundNoise)/averagedOctave.ClaimNoise > signalThreshold,
 			}
 
 			if analyzedNotes[octave] == lastAnalyzedNotes[octave] || octave == 0 {

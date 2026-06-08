@@ -8,15 +8,13 @@ type UserCallback func(heard Heard) (stop bool)
 // The callback type implemented by the user if they want raw sound data.
 type UserCallbackRaw func(heard HeardRaw) (stop bool)
 
-const noteThreshold = 6
-
 // Runs the callback every time new note data is avalable for at least one octave.
 // The first callback argument is the result of sound analysis, as an AnalysisResults[Notes].
 // The second callback argument is group of synthesizers to play notes in each octave, as a Choir.
 // If you want raw sound data use RunWithRawSound().
 // The callback is called off of the main thread/goroutine.
 func Run(callback UserCallback) error {
-	var rawCallback = newNoteAnalyzer(callback, noteThreshold)
+	var rawCallback = newNoteAnalyzer(callback)
 	return RunWithRawSound(rawCallback)
 }
 

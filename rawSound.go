@@ -1,17 +1,27 @@
 package core
 
-import "math/cmplx"
+import (
+	"slices"
 
-// The raw sound data heard, with loudnesses between zero and one.
-// Background noise is included, which is a sampling of many non-note frequencies in the same octave.
+	"github.com/averagestardust/eridol-core-go/internal"
+)
+
+// The raw sound data heard as float point loudnesses.
+// Background noise around each note, and on average in the whole octave is also included.
 type RawSound struct {
-	B            float32
-	Ds           float32
-	Fs           float32
-	A            float32
-	Claim        float32
-	CounterClaim float32
-	Noise        float32
+	B                 float32
+	Ds                float32
+	Fs                float32
+	A                 float32
+	Claim             float32
+	CounterClaim      float32
+	BNoise            float32
+	DsNoise           float32
+	FsNoise           float32
+	ANoise            float32
+	ClaimNoise        float32
+	CounterClaimNoise float32
+	BackgroundNoise   float32
 }
 
 const bBin = 28
@@ -21,29 +31,46 @@ const claimBin = 47
 const aBin = 50
 const counterClaimBin = 53
 
-var noiseBins = []int{26, 32, 39, 45, 48, 52, 55}
+var signalContainingBins = []int{28, 35, 36, 42, 47, 49, 50, 52, 53}
 
 func catagorizeSound(freqDomain []complex64) RawSound {
-	var backgroundNoise float32
-	for _, bin := range noiseBins {
-		backgroundNoise += complex64Abs(freqDomain[bin])
+	var backgroundNoise float32 = 0
+
+	for i := bBin - 1; i <= counterClaimBin+2; i++ {
+		// skip exact bins to not weight average too high
+		if slices.Contains(signalContainingBins, i) {
+			continue
+		}
+
+		// sum up background noise
+		backgroundNoise += internal.C64Abs(freqDomain[i])
 	}
-	backgroundNoise /= float32(len(noiseBins))
+
+	backgroundNoise /= float32(counterClaimBin - bBin + 5 - len(signalContainingBins))
 
 	return RawSound{
-		B:            complex64Abs(freqDomain[bBin]),
-		Ds:           complex64Abs(freqDomain[dsBin]),
-		Fs:           complex64Abs(freqDomain[fsBin]),
-		Claim:        complex64Abs(freqDomain[claimBin]),
-		A:            complex64Abs(freqDomain[aBin]),
-		CounterClaim: complex64Abs(freqDomain[counterClaimBin]),
-		Noise:        backgroundNoise,
-	}
-}
+		B:            internal.C64Abs(freqDomain[bBin]),
+		Ds:           internal.C64Abs(freqDomain[dsBin]),
+		Fs:           internal.C64Abs(freqDomain[fsBin]),
+		A:            internal.C64Abs(freqDomain[aBin]),
+		Claim:        internal.C64Abs(freqDomain[claimBin]),
+		CounterClaim: internal.C64Abs(freqDomain[counterClaimBin]),
 
-func complex64Abs(n complex64) float32 {
-	// ughhh go please
-	return float32(cmplx.Abs(complex128(n)))
+		BNoise: (internal.C64Abs(freqDomain[bBin-1]) +
+			internal.C64Abs(freqDomain[bBin+1])) / 2,
+		DsNoise: (internal.C64Abs(freqDomain[dsBin-1]) +
+			internal.C64Abs(freqDomain[dsBin+1])) / 2,
+		FsNoise: (internal.C64Abs(freqDomain[fsBin-1]) +
+			internal.C64Abs(freqDomain[fsBin+1])) / 2,
+		ANoise: (internal.C64Abs(freqDomain[aBin-1]) +
+			internal.C64Abs(freqDomain[aBin+1])) / 2,
+		ClaimNoise: (internal.C64Abs(freqDomain[claimBin-1]) +
+			internal.C64Abs(freqDomain[claimBin+1])) / 2,
+		CounterClaimNoise: (internal.C64Abs(freqDomain[counterClaimBin-1]) +
+			internal.C64Abs(freqDomain[counterClaimBin+1])) / 2,
+
+		BackgroundNoise: backgroundNoise,
+	}
 }
 
 // Adds two raw noises element-wise and returns the sum.
@@ -55,7 +82,15 @@ func (a RawSound) Add(b RawSound) RawSound {
 		A:            a.A + b.A,
 		Claim:        a.Claim + b.Claim,
 		CounterClaim: a.CounterClaim + b.CounterClaim,
-		Noise:        a.Noise + b.Noise,
+
+		BNoise:            a.BNoise + b.BNoise,
+		DsNoise:           a.DsNoise + b.DsNoise,
+		FsNoise:           a.FsNoise + b.FsNoise,
+		ANoise:            a.ANoise + b.ANoise,
+		ClaimNoise:        a.ClaimNoise + b.ClaimNoise,
+		CounterClaimNoise: a.CounterClaimNoise + b.CounterClaimNoise,
+
+		BackgroundNoise: a.BackgroundNoise + b.BackgroundNoise,
 	}
 }
 
@@ -68,6 +103,14 @@ func (a RawSound) Scale(b float32) RawSound {
 		A:            a.A * b,
 		Claim:        a.Claim * b,
 		CounterClaim: a.CounterClaim * b,
-		Noise:        a.Noise * b,
+
+		BNoise:            a.BNoise * b,
+		DsNoise:           a.DsNoise * b,
+		FsNoise:           a.FsNoise * b,
+		ANoise:            a.ANoise * b,
+		ClaimNoise:        a.ClaimNoise * b,
+		CounterClaimNoise: a.CounterClaimNoise * b,
+
+		BackgroundNoise: a.BackgroundNoise * b,
 	}
 }
