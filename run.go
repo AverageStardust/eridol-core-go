@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
@@ -50,7 +51,6 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 	if doLogging {
 		log.Println("eridolcore: Waiting for IO to start.")
 	}
-
 	stopIO, err := newIO(wrappedRunFFT)
 	if err != nil {
 		return err
@@ -60,28 +60,39 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 		log.Println("eridolcore: Ready to run user callback.")
 	}
 
-	// run untill callback tells us to stop
+	// run until callback tells us to stop
 	for !stopping {
 		stopping = callback(<-heardFFT)
 	}
 
-	globalChoir.silence()
-
-	if doLogging {
-		log.Println("eridolcore: Waiting for synths to go silent.")
-	}
-
-	// wait for choir to silence
-	time.Sleep(time.Second * (1 / synthFadeSpeed) / sampleRate)
+	silenceChoirAndWait()
 
 	err = stopIO()
 
+	ignoreUntilFFTStops(stopFFT, heardFFT)
+
+	if doLogging {
+		log.Println("eridolcore: Exiting run loop.")
+	}
+
+	return err
+}
+
+func silenceChoirAndWait() {
+	globalChoir.silence()
+
+	// wait for choir to silence
+	faidTime := time.Second*(1/synthFadeSpeed)/time.Duration(sampleRate) + time.Millisecond*10
+	if doLogging {
+		fmt.Printf("eridolcore: Waiting for %v synths to go silent.\n", faidTime)
+	}
+	time.Sleep(time.Second * (1 / synthFadeSpeed) / time.Duration(sampleRate))
+}
+
+func ignoreUntilFFTStops(stopFFT chan struct{}, heardFFT chan HeardRaw) {
 	if doLogging {
 		log.Println("eridolcore: Waiting for FFT to stop.")
 	}
-
-	// stop fft first, even if we get an error
-
 	// stop fft first, even if we just got an error
 loop:
 	for {
@@ -92,10 +103,4 @@ loop:
 			// discard
 		}
 	}
-
-	if doLogging {
-		log.Println("eridolcore: Exiting run loop.")
-	}
-
-	return err
 }

@@ -11,7 +11,9 @@ type soundQuanta struct {
 	frameCount uint32
 }
 
-const sampleRate = 48000
+const preferredSampleRate = 48000
+
+var sampleRate uint32 = preferredSampleRate
 
 func newIO(runFFT func(soundQuanta)) (stop func() error, err error) {
 	context, err := initContext()
@@ -53,7 +55,7 @@ func initDevice(context malgo.Context, dataCallback malgo.DataProc) (device *mal
 	deviceConfig.Capture.Channels = 1
 	deviceConfig.Playback.Format = malgo.FormatS16
 	deviceConfig.Playback.Channels = 1
-	deviceConfig.SampleRate = sampleRate
+	deviceConfig.SampleRate = preferredSampleRate
 	deviceConfig.NoPreSilencedOutputBuffer = 1
 	deviceConfig.NoClip = 1
 
@@ -61,6 +63,8 @@ func initDevice(context malgo.Context, dataCallback malgo.DataProc) (device *mal
 	if err != nil {
 		return nil, err
 	}
+
+	sampleRate = deviceConfig.SampleRate
 
 	err = device.Start()
 	return
