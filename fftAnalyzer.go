@@ -153,6 +153,11 @@ outerLoop:
 			// run fft
 			fftPlan.Forward(frequencyDomain, timeDomain)
 
+			if visualizedOctave == octave {
+				println("------ Octave", octave, "FFT Visualized ------")
+				internal.VisualizeFrequencyDomain(frequencyDomain[bBin-2:counterClaimBin+4], 10)
+			}
+
 			// categorize bins
 			octaveSounds[octave] = catagorizeSound(frequencyDomain)
 			isOctaveChanged[octave] = true

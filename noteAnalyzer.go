@@ -1,6 +1,6 @@
 package core
 
-const signalThreshold = 3.8
+const signalThreshold = 4
 
 func newNoteAnalyzer(callback UserCallback) UserCallbackRaw {
 	var consistentNotes [OctaveCount]Notes
