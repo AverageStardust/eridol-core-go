@@ -1,25 +1,21 @@
 package core
 
-import (
-	"time"
-)
-
-func createNoteAnalyzer(callback NotesCallback, signalThreshold float32) SoundCallback {
+func newNoteAnalyzer(callback UserCallback, signalThreshold float32) UserCallbackRaw {
 	var consistentNotes [OctaveCount]Notes
 	var lastAnalyzedNotes [OctaveCount]Notes
-	var lastRawOctaves [OctaveCount]Sound
+	var lastRawOctaves [OctaveCount]RawSound
 
-	return func(rawOctaves [OctaveCount]Sound, analysisTime time.Duration) {
+	return func(results HeardRaw) bool {
 		var analyzedNotes [OctaveCount]Notes
 
 		for octave := range OctaveCount {
-			if !IsOctaveUpdated(octave) {
+			if results.IsOctaveChanged[octave] {
 				continue
 			}
 
 			// mix last two samples be less sensative to random changes
-			averagedOctave := rawOctaves[octave].Scale(0.7).Add(lastRawOctaves[octave].Scale(0.3))
-			lastRawOctaves[octave] = rawOctaves[octave]
+			averagedOctave := results.Octaves[octave].Scale(0.7).Add(lastRawOctaves[octave].Scale(0.3))
+			lastRawOctaves[octave] = results.Octaves[octave]
 
 			// check that
 			analyzedNotes[octave] = Notes{
@@ -38,6 +34,12 @@ func createNoteAnalyzer(callback NotesCallback, signalThreshold float32) SoundCa
 			lastAnalyzedNotes[octave] = analyzedNotes[octave]
 		}
 
-		callback(consistentNotes, analysisTime)
+		noteResults := Heard{
+			Octaves:         consistentNotes,
+			IsOctaveChanged: results.IsOctaveChanged,
+			TimeRunning:     results.TimeRunning,
+		}
+
+		return callback(noteResults)
 	}
 }

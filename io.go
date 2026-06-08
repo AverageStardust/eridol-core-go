@@ -6,102 +6,73 @@ import (
 	"github.com/gen2brain/malgo"
 )
 
-var context *malgo.AllocatedContext
-var device *malgo.Device
+type soundQuanta struct {
+	buffer     []byte
+	frameCount uint32
+}
 
-// Sets up the sound library to listen and play.
-func Init() {
-	if context != nil {
-		return
+const sampleRate = 48000
+
+func newIO(runFFT func(soundQuanta)) (stop func() error, err error) {
+	context, err := initContext(false)
+	if err != nil {
+		return nil, err
 	}
 
-	var err error
-	context, err = malgo.InitContext(nil, malgo.ContextConfig{}, func(message string) {
-		if DoLogging {
+	device, err := initDevice(context.Context, func(outBuffer, inBuffer []byte, frameCount uint32) {
+		// start fft analyzer
+		runFFT(soundQuanta{
+			buffer:     inBuffer,
+			frameCount: frameCount,
+		})
+
+		// write synth output
+		choir.writeTo(soundQuanta{
+			buffer:     outBuffer,
+			frameCount: frameCount,
+		})
+	})
+
+	return func() error {
+		device.Uninit()
+		return uninitContext(context)
+	}, nil
+}
+
+func initContext(doLogging bool) (context *malgo.AllocatedContext, err error) {
+	return malgo.InitContext(nil, malgo.ContextConfig{}, func(message string) {
+		if doLogging {
 			log.Println("miniaudio: ", message)
 		}
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
+}
 
-	if DoLogging {
-		log.Println("eridol-core: Created malgo context")
-	}
-
+func initDevice(context malgo.Context, dataCallback malgo.DataProc) (device *malgo.Device, err error) {
 	deviceConfig := malgo.DefaultDeviceConfig(malgo.Duplex)
 	deviceConfig.Capture.Format = malgo.FormatS16
 	deviceConfig.Capture.Channels = 1
 	deviceConfig.Playback.Format = malgo.FormatS16
 	deviceConfig.Playback.Channels = 1
+	deviceConfig.SampleRate = sampleRate
 	deviceConfig.NoPreSilencedOutputBuffer = 1
 	deviceConfig.NoClip = 1
 
-	device, err = malgo.InitDevice(context.Context, deviceConfig, malgo.DeviceCallbacks{
-		Data: deviceDataCallback,
-	})
+	device, err = malgo.InitDevice(context, deviceConfig, malgo.DeviceCallbacks{Data: dataCallback})
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	if DoLogging {
-		log.Println("eridol-core: Created malgo device")
+		return nil, err
 	}
 
 	err = device.Start()
+	return
+}
+
+func uninitContext(context *malgo.AllocatedContext) (err error) {
+	err = context.Uninit()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	if DoLogging {
-		log.Println("eridol-core: Started malgo device")
-	}
-}
+	context.Free()
 
-// Closes all oscillators and waits for them to go silent.
-// Then closes the sound library.
-func Uninit() {
-	if isClosingOscillators() {
-		return
-	}
-
-	closeOscillators(finishUninit)
-}
-
-func finishUninit() {
-	if device != nil {
-		device.Uninit()
-
-		if DoLogging {
-			println("eridol-core: Released malgo device")
-		}
-
-		device = nil
-	}
-
-	if context != nil {
-		err := context.Uninit()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		context.Free()
-
-		if DoLogging {
-			log.Println("eridol-core: Released malgo context")
-		}
-
-		context = nil
-	}
-}
-
-func deviceDataCallback(outBuffer, inBuffer []byte, frameCount uint32) {
-	// write output
-	writeOscillators(outBuffer, int(frameCount))
-
-	// read input
-	enqueueData(inBuffer, frameCount)
-
-	// start analyze
-	go analyzeData()
+	return nil
 }

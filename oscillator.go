@@ -1,169 +1,57 @@
 package core
 
 import (
-	"log"
-	"sync"
+	"math"
 
-	internal "github.com/averagestardust/eridol-core-go/internal"
+	"github.com/averagestardust/eridol-core-go/internal"
 )
 
-type oscillatorPlan struct {
-	timeSamples uint64
-	targetNotes Notes
+type oscillator struct {
+	B            float32
+	Ds           float32
+	Fs           float32
+	A            float32
+	Claim        float32
+	CounterClaim float32
 }
 
-type Oscillator struct {
-	octave       int
-	currentSound oscillatorSound
-	targetNotes  Notes
-	plans        *internal.Ring[*oscillatorPlan]
-	alive        bool
+func (osc oscillator) sample(time float64, octave int) (amplitude float32) {
+	octaveMultiplier := float64(uint(1) << octave)
+
+	amplitude = oscillatorWave(time, 123.47*octaveMultiplier) * osc.B
+	amplitude += oscillatorWave(time, 155.56*octaveMultiplier) * osc.Ds
+	amplitude += oscillatorWave(time, 185.00*octaveMultiplier) * osc.Fs
+	amplitude += oscillatorWave(time, 207.65*octaveMultiplier) * osc.Claim
+	amplitude += oscillatorWave(time, 220.00*octaveMultiplier) * osc.A
+	amplitude += oscillatorWave(time, 233.08*octaveMultiplier) * osc.CounterClaim
+
+	return
 }
 
-var oscillators = internal.Set[*Oscillator]{}
-var oscillatorMutex = sync.Mutex{}
+func oscillatorWave(time float64, frequency float64) float32 {
+	phase := time * frequency
+	return float32(math.Sin(phase * math.Pi * 2))
+}
 
-// Creates an oscillator to play at one octave.
-// Note timing is guaranteed to be consitant with runtime when called inside a callback from OnSound() or OnNotes().
-// Timing is undefined outside of callbacks.
-// Run .Close() if you are done using the oscillator before the end of the program.
-func NewOscillator(octave int) (osc *Oscillator) {
-	osc = &Oscillator{
-		octave: octave,
-		plans:  internal.NewRing[*oscillatorPlan](4),
-		alive:  true,
-	}
+func (osc oscillator) maxAmplitude() float32 {
+	return osc.B + osc.Ds + osc.Fs + osc.A + osc.Claim + osc.CounterClaim
+}
 
-	if isClosingOscillators() {
-		log.Println("eridol-core: Warning! Created oscillator while Uninit() is still closing. Oscillator will be silent.")
-		osc.alive = false
-		return osc
-	}
-
-	oscillatorMutex.Lock()
-	oscillators.Add(osc)
-	oscillatorMutex.Unlock()
+func (osc oscillator) stepTowards(notes Notes, step float32) oscillator {
+	osc.B = stepSoundToNote(osc.B, notes.B, step)
+	osc.Ds = stepSoundToNote(osc.Ds, notes.Ds, step)
+	osc.Fs = stepSoundToNote(osc.Fs, notes.Fs, step)
+	osc.A = stepSoundToNote(osc.A, notes.A, step)
+	osc.Claim = stepSoundToNote(osc.Claim, notes.Claim, step)
+	osc.CounterClaim = stepSoundToNote(osc.CounterClaim, notes.CounterClaim, step)
 
 	return osc
 }
 
-// Starts one note playing.
-func (osc *Oscillator) PlayNote(note Note) {
-	osc.SetNote(note, true)
-}
-
-// Stops one note from playing.
-func (osc *Oscillator) StopNote(note Note) {
-	osc.SetNote(note, false)
-}
-
-// Sets at single note to playing or not playing.
-func (osc *Oscillator) SetNote(note Note, playing bool) {
-	oscillatorMutex.Lock()
-	defer oscillatorMutex.Unlock()
-
-	plannedTime := fftSamples + oscillatorLatency
-
-	if plannedTime < oscillatorSamples {
-		log.Println("eridol-core: Warning! Missed note change because code is too slow.")
-		return
-	}
-
-	nextPlan, success := osc.plans.Peek(osc.plans.Tail())
-
-	if success {
-		if nextPlan.timeSamples < fftSamples {
-			// add new plan after
-			osc.plans.Enqueue(&oscillatorPlan{
-				timeSamples: plannedTime,
-				targetNotes: nextPlan.targetNotes.Set(note, playing),
-			})
-		} else {
-			// update plan
-			nextPlan.targetNotes = nextPlan.targetNotes.Set(note, playing)
-		}
+func stepSoundToNote(sound float32, note bool, step float32) float32 {
+	if note {
+		return internal.StepTowards(sound, 1, step)
 	} else {
-		// add first plan
-		osc.plans.Enqueue(&oscillatorPlan{
-			timeSamples: plannedTime,
-			targetNotes: osc.targetNotes.Set(note, playing),
-		})
+		return internal.StepTowards(sound, 0, step)
 	}
-}
-
-// Stops all notes from playing on oscillator.
-func (osc *Oscillator) Stop() {
-	osc.Play(Notes{})
-}
-
-// Plays some set of notes on oscillator.
-func (osc *Oscillator) Play(notes Notes) {
-	oscillatorMutex.Lock()
-	defer oscillatorMutex.Unlock()
-
-	plannedTime := fftSamples + oscillatorLatency
-
-	if plannedTime < oscillatorSamples {
-		log.Println("eridol-core: Warning! Missed note change because code is too slow.")
-		return
-	}
-
-	nextPlan, success := osc.plans.Peek(osc.plans.Tail())
-
-	if !success || nextPlan.timeSamples < fftSamples {
-		// add first plan or add new plan after
-		osc.plans.Enqueue(&oscillatorPlan{
-			timeSamples: plannedTime,
-			targetNotes: notes,
-		})
-	} else {
-		// update plan
-		nextPlan.targetNotes = notes
-	}
-}
-
-// Closes the oscillator so it will stop making sound.
-func (osc *Oscillator) Close() {
-	oscillatorMutex.Lock()
-	defer oscillatorMutex.Unlock()
-
-	osc.alive = false
-	osc.plans.DropAll()
-
-	osc.plans.Enqueue(&oscillatorPlan{
-		timeSamples: oscillatorSamples,
-		targetNotes: Notes{},
-	})
-}
-
-// Checks if the oscillator has been closed.
-func (osc *Oscillator) IsClosed() bool {
-	return !osc.alive
-}
-
-func (osc *Oscillator) sample() (amplitude float32, maxAmplitude float32) {
-	nextPlan, success := osc.plans.Peek(osc.plans.Tail())
-
-	if success && oscillatorSamples >= nextPlan.timeSamples {
-		osc.targetNotes = nextPlan.targetNotes
-		osc.plans.Dequeue()
-	}
-
-	time := float64(oscillatorSamples) / float64(sampleRate)
-
-	osc.currentSound.stepTo(osc.targetNotes, 0.001)
-
-	amplitude = osc.currentSound.sample(time, osc.octave)
-	maxAmplitude = osc.currentSound.maxAmplitude()
-
-	if !osc.alive && maxAmplitude == 0 {
-		oscillators.Delete(osc)
-		if len(oscillators) == 0 {
-			if afterLastOscillatorGoesSilent != nil {
-				afterLastOscillatorGoesSilent()
-			}
-		}
-	}
-
-	return
 }

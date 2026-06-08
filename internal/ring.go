@@ -1,5 +1,7 @@
 package internal
 
+import "iter"
+
 type Ring[T any] struct {
 	buffer []T
 	head   uint64
@@ -38,10 +40,22 @@ func (ring *Ring[T]) PeekBatch(index uint64, amount uint64) (element []T, succes
 	elements := make([]T, amount)
 
 	for i := range amount {
-		elements[i] = ring.buffer[(index+i)&(ring.mask())]
+		elements[i] = ring.buffer[(index+i)&ring.mask()]
 	}
 
 	return elements, true
+}
+
+func (ring *Ring[T]) Iter() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for i := ring.tail; i < ring.head; i++ {
+			element := ring.buffer[i&ring.mask()]
+
+			if !yield(element) {
+				return
+			}
+		}
+	}
 }
 
 func (ring *Ring[T]) Drop(n uint64) bool {
@@ -62,6 +76,15 @@ func (ring *Ring[T]) DropUntil(index uint64) bool {
 	return true
 }
 
+func (ring *Ring[T]) DropFrom(index uint64) bool {
+	if index < ring.tail {
+		return false
+	}
+
+	ring.head = min(ring.head, index)
+	return true
+}
+
 func (ring *Ring[T]) DropAll() {
 	ring.tail = ring.head
 }
@@ -74,7 +97,7 @@ func (ring *Ring[T]) DequeueBatch(amount uint64) (elements []T, success bool) {
 	elements = make([]T, amount)
 
 	for i := range amount {
-		elements[i] = ring.buffer[ring.tail&(ring.mask())]
+		elements[i] = ring.buffer[ring.tail&ring.mask()]
 		ring.tail++
 	}
 
