@@ -12,22 +12,30 @@ type UserCallback func(heard Heard) (stop bool)
 // The callback type implemented by the user if they want raw sound data.
 type UserCallbackRaw func(heard HeardRaw) (stop bool)
 
+const defaultSignalThreshold = 4
+
 // Runs the callback every time new note data is avalable for at least one octave.
-// The first callback argument is the result of sound analysis, as an AnalysisResults[Notes].
-// The second callback argument is group of synthesizers to play notes in each octave, as a Choir.
+// Will not return until the callback returns true to stop.
 // If you want raw sound data use RunWithRawSound().
-// The callback is called off of the main thread/goroutine.
+// If you want to set the threshold for note detection, use RunWithThreshold().
 func Run(callback UserCallback) error {
-	var rawCallback = newNoteAnalyzer(callback)
+	return RunWithThreshold(callback, 4)
+}
+
+// Runs the callback every time new note data is avalable for at least one octave.
+// The sensativity to detecting notes can be set with signalThreshold.
+// If the sensativity is too low it may detect false positives, if it's too high it won't be able to hear quite notes.
+// Will not return until the callback returns true to stop.
+// The default threshould used by Run() is 4, use that if you want a safe value.
+func RunWithThreshold(callback UserCallback, signalThreshold float32) error {
+	var rawCallback = newNoteAnalyzer(callback, signalThreshold)
 	return RunWithRawSound(rawCallback)
 }
 
 // Runs the callback every time new sound data is avalable fo r at least one octave.
 // Sound data is just raw numbers for the loudness of each note, as well as background noise.
-// The first callback argument is the result of basic sound analysis, as an AnalysisResults[RawSound].
-// The second callback argument is group of synthesizers to play notes in each octave, as a Choir.
+// Will not return until the callback returns true to stop.
 // If you want analyzed note data use Run().
-// The callback is called off of the main thread/goroutine.
 func RunWithRawSound(callback UserCallbackRaw) error {
 	if doLogging {
 		log.Println("eridolcore: Entering run loop.")
