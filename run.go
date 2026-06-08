@@ -52,7 +52,7 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 		stopping = callback(<-heardFFT)
 	}
 
-	choir.silence()
+	globalChoir.silence()
 
 	// wait for choir to silence
 	time.Sleep(time.Second * (1 / synthFadeSpeed) / sampleRate)

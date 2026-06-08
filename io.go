@@ -27,7 +27,7 @@ func newIO(runFFT func(soundQuanta)) (stop func() error, err error) {
 		})
 
 		// write synth output
-		choir.writeTo(soundQuanta{
+		globalChoir.writeTo(soundQuanta{
 			buffer:     outBuffer,
 			frameCount: frameCount,
 		})

@@ -2,6 +2,8 @@ package core
 
 import "math/cmplx"
 
+// The raw sound data heard, with loudnesses between zero and one.
+// Background noise is included, which is a sampling of many non-note frequencies in the same octave.
 type RawSound struct {
 	B            float32
 	Ds           float32
@@ -44,6 +46,7 @@ func complex64Abs(n complex64) float32 {
 	return float32(cmplx.Abs(complex128(n)))
 }
 
+// Adds two raw noises element-wise and returns the sum.
 func (a RawSound) Add(b RawSound) RawSound {
 	return RawSound{
 		B:            a.B + b.B,
@@ -56,6 +59,7 @@ func (a RawSound) Add(b RawSound) RawSound {
 	}
 }
 
+// Scales each element in a raw noise and returns it.
 func (a RawSound) Scale(b float32) RawSound {
 	return RawSound{
 		B:            a.B * b,

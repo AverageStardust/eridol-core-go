@@ -6,15 +6,15 @@ import (
 )
 
 // A set of synthesizers, one for each octave.
-type Choir struct {
+type choir struct {
 	synths      [OctaveCount]*Synthesizer
 	timeSamples uint64
 }
 
-var choir = newChoir()
+var globalChoir = newChoir()
 
-func newChoir() *Choir {
-	choir := &Choir{}
+func newChoir() *choir {
+	choir := &choir{}
 
 	for i := range OctaveCount {
 		choir.synths[i] = newSynth(i)
@@ -26,10 +26,10 @@ func newChoir() *Choir {
 // Returns the synthesizer for the octave Nth octave.
 // This synth is the same for the entire life of the program.
 func Synth(n int) *Synthesizer {
-	return choir.synths[n]
+	return globalChoir.synths[n]
 }
 
-func (choir *Choir) writeTo(quanta soundQuanta) {
+func (choir *choir) writeTo(quanta soundQuanta) {
 	for i := range quanta.frameCount {
 		amplitude := choir.sample()
 
@@ -38,7 +38,7 @@ func (choir *Choir) writeTo(quanta soundQuanta) {
 	}
 }
 
-func (choir *Choir) sample() float32 {
+func (choir *choir) sample() float32 {
 	var totalAmplitude, totalMax float32
 
 	for _, synth := range choir.synths {
@@ -65,7 +65,7 @@ func (choir *Choir) sample() float32 {
 	return totalAmplitude / totalMax
 }
 
-func (choir *Choir) silence() {
+func (choir *choir) silence() {
 	for _, synth := range choir.synths {
 		synth.Silence()
 	}
