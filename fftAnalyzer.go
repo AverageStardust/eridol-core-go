@@ -52,14 +52,14 @@ func newFFTAnalyzer(heard chan HeardRaw) (run func(soundQuanta), stop chan struc
 	stop = make(chan struct{})
 
 	go func() {
-	fftLoop:
+	loop:
 		for {
 			select {
 			case <-doneEnqueingData:
 				sampleFFTData(octaveRings, inputRing)
 				analyzeFFTData(heard, octaveSounds, frequencyDomain, fftPlan, octaveRings)
 			case <-stop:
-				break fftLoop
+				break loop
 			}
 		}
 	}()

@@ -47,6 +47,10 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 		}
 	}
 
+	if doLogging {
+		log.Println("eridolcore: Waiting for IO to start.")
+	}
+
 	stopIO, err := newIO(wrappedRunFFT)
 	if err != nil {
 		return err
@@ -72,8 +76,22 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 
 	err = stopIO()
 
+	if doLogging {
+		log.Println("eridolcore: Waiting for FFT to stop.")
+	}
+
 	// stop fft first, even if we get an error
-	stopFFT <- struct{}{}
+
+	// stop fft first, even if we just got an error
+loop:
+	for {
+		select {
+		case stopFFT <- struct{}{}:
+			break loop
+		case <-heardFFT:
+			// discard
+		}
+	}
 
 	if doLogging {
 		log.Println("eridolcore: Exiting run loop.")
