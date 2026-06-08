@@ -1,6 +1,9 @@
 package core
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 // The callback type implemented by the user if they want processed notes.
 type UserCallback func(heard Heard) (stop bool)
@@ -25,6 +28,10 @@ func Run(callback UserCallback) error {
 // If you want analyzed note data use Run().
 // The callback is called off of the main thread/goroutine.
 func RunWithRawSound(callback UserCallbackRaw) error {
+	if doLogging {
+		log.Println("eridolcore: Entering run loop.")
+	}
+
 	heardFFT := make(chan HeardRaw)
 
 	runFFT, stopFFT, err := newFFTAnalyzer(heardFFT)
@@ -45,12 +52,20 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 		return err
 	}
 
+	if doLogging {
+		log.Println("eridolcore: Ready to run user callback.")
+	}
+
 	// run untill callback tells us to stop
 	for !stopping {
 		stopping = callback(<-heardFFT)
 	}
 
 	globalChoir.silence()
+
+	if doLogging {
+		log.Println("eridolcore: Waiting for synths to go silent.")
+	}
 
 	// wait for choir to silence
 	time.Sleep(time.Second * (1 / synthFadeSpeed) / sampleRate)
@@ -59,6 +74,10 @@ func RunWithRawSound(callback UserCallbackRaw) error {
 
 	// stop fft first, even if we get an error
 	stopFFT <- struct{}{}
+
+	if doLogging {
+		log.Println("eridolcore: Exiting run loop.")
+	}
 
 	return err
 }

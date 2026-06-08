@@ -14,7 +14,7 @@ type soundQuanta struct {
 const sampleRate = 48000
 
 func newIO(runFFT func(soundQuanta)) (stop func() error, err error) {
-	context, err := initContext(false)
+	context, err := initContext()
 	if err != nil {
 		return nil, err
 	}
@@ -39,10 +39,10 @@ func newIO(runFFT func(soundQuanta)) (stop func() error, err error) {
 	}, nil
 }
 
-func initContext(doLogging bool) (context *malgo.AllocatedContext, err error) {
+func initContext() (context *malgo.AllocatedContext, err error) {
 	return malgo.InitContext(nil, malgo.ContextConfig{}, func(message string) {
 		if doLogging {
-			log.Println("miniaudio: ", message)
+			log.Print("miniaudio:  ", message)
 		}
 	})
 }

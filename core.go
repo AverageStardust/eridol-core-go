@@ -20,6 +20,16 @@ import "time"
 
 const OctaveCount = 6
 
+var doLogging = false
+
+func EnableLogging() {
+	doLogging = true
+}
+
+func DisableLogging() {
+	doLogging = false
+}
+
 func samplesToDuration(samples uint64) time.Duration {
 	return time.Duration(samples) * (time.Second / time.Microsecond) / time.Duration(sampleRate) * time.Microsecond
 }
