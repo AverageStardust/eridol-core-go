@@ -14,9 +14,9 @@ type SynthHandle struct {
 }
 
 type synthPlan struct {
-	samples   uint64
-	notes     Notes
-	callbacks *[]func()
+	samples uint64
+	notes   Notes
+	onDone  *[]func()
 }
 
 // Creates sound output for one octave by playing the necessary notes.
@@ -27,6 +27,7 @@ type Synthesizer struct {
 	plans           *internal.Ring[synthPlan]
 	samplesIntoPlan uint64
 	mutex           sync.Mutex
+	onDone          []func()
 }
 
 const synthFadeSpeed = 0.001
@@ -76,6 +77,13 @@ func (synth *Synthesizer) IsAllDone() bool {
 	defer synth.mutex.Unlock()
 
 	return synth.plans.Size() == 0
+}
+
+func (synth *Synthesizer) OnAllDone(callback func()) {
+	synth.mutex.Lock()
+	defer synth.mutex.Unlock()
+
+	synth.onDone = append(synth.onDone, callback)
 }
 
 // Stops a note already set to be playing immediately.
@@ -137,9 +145,9 @@ func (synth *Synthesizer) PlanNotes(notes Notes, duration time.Duration) (handle
 	handle = SynthHandle{synth.plans.Head(), synth}
 
 	synth.plans.Enqueue(synthPlan{
-		samples:   durationToSamples(duration),
-		notes:     notes,
-		callbacks: &[]func(){},
+		samples: durationToSamples(duration),
+		notes:   notes,
+		onDone:  &[]func(){},
 	})
 
 	return handle
@@ -169,10 +177,19 @@ func (synth *Synthesizer) advancePlan() (plan synthPlan, success bool) {
 		plan, success = synth.plans.Peek(synth.plans.Tail())
 
 		if !success {
+			for _, callback := range synth.onDone {
+				callback()
+			}
+			synth.onDone = []func(){}
 			return
 		}
 
 		if plan.samples <= synth.samplesIntoPlan {
+			for _, callback := range *plan.onDone {
+				callback()
+			}
+			*plan.onDone = []func(){}
+
 			synth.plans.Dequeue()
 			synth.samplesIntoPlan = 0
 		} else {
@@ -220,7 +237,7 @@ func (handle SynthHandle) OnDone(callback func()) bool {
 	element, success := synth.plans.Peek(handle.index)
 
 	if success {
-		*element.callbacks = append(*element.callbacks, callback)
+		*element.onDone = append(*element.onDone, callback)
 	}
 
 	return success
