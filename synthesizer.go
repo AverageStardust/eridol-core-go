@@ -14,8 +14,9 @@ type SynthHandle struct {
 }
 
 type synthPlan struct {
-	samples uint64
-	notes   Notes
+	samples   uint64
+	notes     Notes
+	callbacks *[]func()
 }
 
 // Creates sound output for one octave by playing the necessary notes.
@@ -136,8 +137,9 @@ func (synth *Synthesizer) PlanNotes(notes Notes, duration time.Duration) (handle
 	handle = SynthHandle{synth.plans.Head(), synth}
 
 	synth.plans.Enqueue(synthPlan{
-		samples: durationToSamples(duration),
-		notes:   notes,
+		samples:   durationToSamples(duration),
+		notes:     notes,
+		callbacks: &[]func(){},
 	})
 
 	return handle
@@ -207,4 +209,19 @@ func (handle SynthHandle) IsDone() bool {
 	defer synth.mutex.Unlock()
 
 	return synth.plans.Tail() > handle.index
+}
+
+func (handle SynthHandle) OnDone(callback func()) bool {
+	synth := handle.synth
+
+	synth.mutex.Lock()
+	defer synth.mutex.Unlock()
+
+	element, success := synth.plans.Peek(handle.index)
+
+	if success {
+		*element.callbacks = append(*element.callbacks, callback)
+	}
+
+	return success
 }
