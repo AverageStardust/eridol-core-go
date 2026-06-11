@@ -83,7 +83,11 @@ func (synth *Synthesizer) OnAllDone(callback func()) {
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
 
-	synth.onDone = append(synth.onDone, callback)
+	if synth.plans.Size() == 0 {
+		callback()
+	} else {
+		synth.onDone = append(synth.onDone, callback)
+	}
 }
 
 // Stops a note already set to be playing immediately.
@@ -233,6 +237,11 @@ func (handle SynthHandle) OnDone(callback func()) bool {
 
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
+
+	if synth.plans.Tail() > handle.index {
+		callback()
+		return true
+	}
 
 	element, success := synth.plans.Peek(handle.index)
 
