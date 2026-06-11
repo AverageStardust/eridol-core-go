@@ -23,6 +23,24 @@ const (
 	CounterClaim
 )
 
+// Returns true if note sets are equal, ignoring the claim and counter-claim tones which may be different.
+func (a Notes) IsEqualWithoutTones(b Notes) bool {
+	return a.B == b.B &&
+		a.Ds == b.Ds &&
+		a.Fs == b.Fs &&
+		a.A == b.A
+}
+
+// Returns true if note sets are exactly equal.
+func (a Notes) IsEqual(b Notes) bool {
+	return a.B == b.B &&
+		a.Ds == b.Ds &&
+		a.Fs == b.Fs &&
+		a.A == b.A &&
+		a.Claim == b.Claim &&
+		a.CounterClaim == b.CounterClaim
+}
+
 // Returns the union of both sets of notes.
 // An output note will be playing if it is playing in either input set.
 func (a Notes) Union(b Notes) Notes {

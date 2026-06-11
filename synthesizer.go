@@ -70,7 +70,7 @@ func (synth *Synthesizer) PlanTimeRemaining() time.Duration {
 }
 
 // Returns true if all planned sounds are done playing.
-func (synth *Synthesizer) IsPlanDone() bool {
+func (synth *Synthesizer) IsAllDone() bool {
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
 
