@@ -8,7 +8,10 @@ import (
 )
 
 // A handle to planned Synth notes, allows them to be cancled later with CancelPlansFrom().
-type SynthPlanHandle uint64
+type SynthPlanHandle struct {
+	index uint64
+	synth *Synthesizer
+}
 
 type synthPlan struct {
 	samples uint64
@@ -66,6 +69,14 @@ func (synth *Synthesizer) PlanTimeRemaining() time.Duration {
 	return samplesToDuration(timeSamples)
 }
 
+// Returns true if all planned sounds are done playing.
+func (synth *Synthesizer) IsPlanDone() bool {
+	synth.mutex.Lock()
+	defer synth.mutex.Unlock()
+
+	return synth.plans.Size() == 0
+}
+
 // Stops a note already set to be playing immediately.
 // Does not affect planned notes in any way.
 func (synth *Synthesizer) StopNoteImmediately(note Note) {
@@ -98,25 +109,12 @@ func (synth *Synthesizer) SetNotesImmediately(notes Notes) {
 
 // Cancels all planned notes and delays.
 // Notes started with PlayNoteImmediately() will continue regardless until stopped with StopNoteImmediately().
-func (synth *Synthesizer) CancelAllPlans(handle SynthPlanHandle) {
+func (synth *Synthesizer) CancelAllPlans() {
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
 
 	synth.plans.DropAll()
 	synth.samplesIntoPlan = 0
-}
-
-// Cancels any planned notes from the handle onwards.
-// Notes started with PlayNoteImmediately() will continue regardless until stopped with StopNoteImmediately().
-func (synth *Synthesizer) CancelPlansFrom(handle SynthPlanHandle) {
-	synth.mutex.Lock()
-	defer synth.mutex.Unlock()
-
-	synth.plans.DropFrom(uint64(handle))
-
-	if synth.plans.Size() == 0 {
-		synth.samplesIntoPlan = 0
-	}
 }
 
 // Plans a silent delay after any existing planned notes.
@@ -135,7 +133,7 @@ func (synth *Synthesizer) PlanNotes(notes Notes, duration time.Duration) (handle
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
 
-	handle = SynthPlanHandle(synth.plans.Head())
+	handle = SynthPlanHandle{synth.plans.Head(), synth}
 
 	synth.plans.Enqueue(synthPlan{
 		samples: durationToSamples(duration),
@@ -184,4 +182,29 @@ func (synth *Synthesizer) advancePlan() (plan synthPlan, success bool) {
 	synth.samplesIntoPlan++
 
 	return
+}
+
+// Cancels any planned notes from the handle onwards.
+// Notes started with synth.PlayNoteImmediately() will continue regardless until stopped with synthStopNoteImmediately().
+func (handle SynthPlanHandle) CancelPlansFrom() {
+	synth := handle.synth
+
+	synth.mutex.Lock()
+	defer synth.mutex.Unlock()
+
+	synth.plans.DropFrom(uint64(handle.index))
+
+	if synth.plans.Size() == 0 {
+		synth.samplesIntoPlan = 0
+	}
+}
+
+// Returns true if all the handle's sound is done playing.
+func (handle SynthPlanHandle) IsDone() bool {
+	synth := handle.synth
+
+	synth.mutex.Lock()
+	defer synth.mutex.Unlock()
+
+	return synth.plans.Tail() >= handle.index
 }
