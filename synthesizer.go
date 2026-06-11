@@ -84,7 +84,7 @@ func (synth *Synthesizer) OnAllDone(callback func()) {
 	defer synth.mutex.Unlock()
 
 	if synth.plans.Size() == 0 {
-		callback()
+		go callback()
 	} else {
 		synth.onDone = append(synth.onDone, callback)
 	}
@@ -182,7 +182,7 @@ func (synth *Synthesizer) advancePlan() (plan synthPlan, success bool) {
 
 		if !success {
 			for _, callback := range synth.onDone {
-				callback()
+				go callback()
 			}
 			synth.onDone = []func(){}
 			return
@@ -190,7 +190,7 @@ func (synth *Synthesizer) advancePlan() (plan synthPlan, success bool) {
 
 		if plan.samples <= synth.samplesIntoPlan {
 			for _, callback := range *plan.onDone {
-				callback()
+				go callback()
 			}
 			*plan.onDone = []func(){}
 
@@ -239,7 +239,7 @@ func (handle SynthHandle) OnDone(callback func()) bool {
 	defer synth.mutex.Unlock()
 
 	if synth.plans.Tail() > handle.index {
-		callback()
+		go callback()
 		return true
 	}
 
