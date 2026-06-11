@@ -8,7 +8,7 @@ import (
 )
 
 // A handle to planned Synth notes, allows them to be cancled later with CancelPlansFrom().
-type SynthPlanHandle struct {
+type SynthHandle struct {
 	index uint64
 	synth *Synthesizer
 }
@@ -121,7 +121,7 @@ func (synth *Synthesizer) CancelAllPlans() {
 // This is the same as running PlanNotes() with an empty set of notes.
 // Notes started with PlayNoteImmediately() will continue regardless until stopped with StopNoteImmediately().
 // Returns a handle to cancel this later.
-func (synth *Synthesizer) PlanDelay(duration time.Duration) (handle SynthPlanHandle) {
+func (synth *Synthesizer) PlanDelay(duration time.Duration) (handle SynthHandle) {
 	return synth.PlanNotes(Notes{}, duration)
 }
 
@@ -129,11 +129,11 @@ func (synth *Synthesizer) PlanDelay(duration time.Duration) (handle SynthPlanHan
 // Will run after any already planned notes, or otherwise as soon as possible.
 // Notes started with PlayNoteImmediately() will continue regardless until stopped with StopNoteImmediately().
 // Returns a handle to cancel this later.
-func (synth *Synthesizer) PlanNotes(notes Notes, duration time.Duration) (handle SynthPlanHandle) {
+func (synth *Synthesizer) PlanNotes(notes Notes, duration time.Duration) (handle SynthHandle) {
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
 
-	handle = SynthPlanHandle{synth.plans.Head(), synth}
+	handle = SynthHandle{synth.plans.Head(), synth}
 
 	synth.plans.Enqueue(synthPlan{
 		samples: durationToSamples(duration),
@@ -186,7 +186,7 @@ func (synth *Synthesizer) advancePlan() (plan synthPlan, success bool) {
 
 // Cancels any planned notes from the handle onwards.
 // Notes started with synth.PlayNoteImmediately() will continue regardless until stopped with synthStopNoteImmediately().
-func (handle SynthPlanHandle) CancelPlansFrom() {
+func (handle SynthHandle) CancelPlansFrom() {
 	synth := handle.synth
 
 	synth.mutex.Lock()
@@ -200,11 +200,11 @@ func (handle SynthPlanHandle) CancelPlansFrom() {
 }
 
 // Returns true if all the handle's sound is done playing.
-func (handle SynthPlanHandle) IsDone() bool {
+func (handle SynthHandle) IsDone() bool {
 	synth := handle.synth
 
 	synth.mutex.Lock()
 	defer synth.mutex.Unlock()
 
-	return synth.plans.Tail() >= handle.index
+	return synth.plans.Tail() > handle.index
 }
